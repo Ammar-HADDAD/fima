@@ -34,8 +34,8 @@
   <title>Fima — Personal expenses</title>
   <!-- THESIS: A personal ledger with a summary and a separate record book. No account or shared-money concepts.
        OWN-WORLD: Paper-white/slate surfaces, ink typography, rust actions; precise rules and aligned money.
-       STORY: Choose a period, understand spending, and record a purchase without setup.
-       FIRST VIEWPORT: Mobile masthead and raised bottom Add action; desktop sidebar with a quiet period selector and one primary header action. Spending summary sits beside category allocation on wide screens.
+       STORY: Choose a month, understand spending or what remains of an optional monthly budget, and record a purchase without setup.
+       FIRST VIEWPORT: Mobile masthead and raised bottom Add action; desktop sidebar with a quiet period selector and one primary header action. A Spending/Budget switch changes the summary beside category allocation, with budget editing inline.
        FORM: User-directed mobile revision within the established functionalist identity. Expanded Settings, focused expense sheets, and a matching home-screen monogram. Local data, no remote services. -->
   <style>
     :root {
@@ -105,7 +105,12 @@
     .nav-add:active .nav-add-icon{background:var(--accent-hover)}
     .settings-trigger{flex:none}
     .nav-add-long,.settings-label,.desktop-actions{display:none}
-    main{padding-top:24px;padding-bottom:calc(var(--nav-height) + env(safe-area-inset-bottom) + 48px)}
+    main{display:flex;flex-direction:column;min-height:calc(100dvh - 69px - env(safe-area-inset-top));padding-top:24px;padding-bottom:calc(var(--nav-height) + env(safe-area-inset-bottom) + 48px)}
+    #overview,#expenses{margin-bottom:32px}
+    .app-footer{display:flex;flex-direction:column;align-items:center;gap:0;margin-top:auto;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;text-align:center}
+    .footer-credit{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:0 4px}
+    .app-footer a{display:inline-flex;align-items:center;min-height:44px;color:inherit;text-underline-offset:3px}
+    .app-footer a:hover{color:var(--ink)}
     .page-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:20px 8px;margin-bottom:24px}
     .eyebrow{font-size:13px;color:var(--muted);margin-top:7px}
     .period-picker{grid-column:1/-1;grid-row:2;width:100%;min-width:0}
@@ -119,6 +124,12 @@
     .install-panel h2{font-size:16px;font-weight:550;line-height:1.4;letter-spacing:0;overflow-wrap:anywhere}
     .install-panel .button{min-height:44px}
     #installApp{grid-column:2;grid-row:1}
+    .overview-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;margin-bottom:16px}
+    .overview-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:2px;padding:2px;background:var(--soft);border-radius:8px}
+    .overview-modes .button{min-width:0;border-color:transparent;border-radius:6px;background:transparent;color:var(--muted);font-weight:500}
+    .overview-modes .button[aria-pressed="true"]{background:var(--surface);color:var(--ink);font-weight:600}
+    .overview-modes .button:hover:not(:disabled){color:var(--ink)}
+    .overview-hint{font-size:13px;color:var(--muted)}
     .overview-surface{background:var(--surface);border:1px solid var(--line);border-radius:12px}
     .overview-grid{display:grid;grid-template-columns:minmax(0,1fr)}
     .total-block{padding:24px 20px;border-bottom:1px solid var(--line)}
@@ -127,6 +138,34 @@
     #totalAmount{min-width:0}
     .total-currency{font-size:14px;color:var(--muted);letter-spacing:0;font-weight:500}
     .total-caption{color:var(--muted);font-size:13px;margin-top:14px}
+    .total-block.over-budget #totalAmount,.total-block.over-budget #totalLabel{color:var(--danger)}
+    .budget-empty h2{margin-bottom:8px}
+    .budget-empty p{font-size:14px;color:var(--muted);max-width:36ch;margin-bottom:20px}
+    .budget-empty .total-caption{margin-bottom:0;font-size:13px}
+    .budget-details{margin-top:28px}
+    .budget-figures{margin:0}
+    .budget-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 12px;font-size:14px;margin-top:12px}
+    .budget-row dt{color:var(--muted)}
+    .budget-row dd{margin:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-variant-numeric:tabular-nums;min-width:0;overflow-wrap:anywhere}
+    .budget-row .button{min-width:44px;padding:10px 8px;color:var(--accent)}
+    .budget-progress{margin-top:20px}
+    .budget-progress progress{display:block;width:100%;height:6px;appearance:none;-webkit-appearance:none;border:0;border-radius:3px;background:var(--soft);color:var(--accent);overflow:hidden}
+    .budget-progress progress::-webkit-progress-bar{background:var(--soft);border-radius:3px}
+    .budget-progress progress::-webkit-progress-value{background:var(--accent);border-radius:3px}
+    .budget-progress progress::-moz-progress-bar{background:var(--accent);border-radius:3px}
+    .over-budget .budget-progress progress{color:var(--danger)}
+    .over-budget .budget-progress progress::-webkit-progress-value{background:var(--danger)}
+    .over-budget .budget-progress progress::-moz-progress-bar{background:var(--danger)}
+    .budget-progress p{margin-top:8px;font-size:13px;color:var(--muted)}
+    .budget-form{margin-top:24px}
+    .budget-setup .budget-form{margin-top:0}
+    .budget-form .amount-field input{font-size:24px}
+    .budget-form .amount-field span{top:20px}
+    .budget-form input[aria-invalid="true"]{border-color:var(--danger)}
+    .budget-form-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+    .budget-form-actions .primary{flex:1}
+    #removeBudget{margin-top:12px;padding-left:0}
+    .category-empty{font-size:14px;color:var(--muted);max-width:36ch}
     .breakdown{padding:24px 20px}
     .section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px}
     .section-heading .muted{font-size:12px;text-align:right}
@@ -237,6 +276,7 @@
     .toast .toast-dismiss{width:44px;text-decoration:none;font-size:21px}
     @media(min-width:560px){
       .shell{padding-left:30px;padding-right:30px}
+      .app-footer{flex-direction:row;justify-content:space-between;gap:8px 24px;text-align:left}
       .form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
       .filters{grid-template-columns:minmax(0,1fr) 210px}
       .expense-row{padding:20px 24px}
@@ -264,7 +304,7 @@
       .nav-add,.period-picker,.all-time{display:none}
       .settings-trigger{width:100%;min-height:48px;padding:12px;justify-content:flex-start;gap:12px;margin-top:auto}
       .settings-label{display:inline}
-      main.shell{grid-column:2;width:100%;max-width:1240px;min-width:0;padding:40px clamp(28px,3.5vw,56px) 64px}
+      main.shell{grid-column:2;width:100%;max-width:1240px;min-width:0;min-height:100dvh;padding:40px clamp(28px,3.5vw,56px) 24px}
       .page-heading{grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:16px;margin-bottom:32px}
       .page-heading h1{font-size:30px}
       .desktop-actions{display:flex;align-items:center;gap:12px}
@@ -286,6 +326,9 @@
       .period-shortcuts .button{padding:10px 12px}
       .period-shortcuts .button[aria-pressed="true"]{background:var(--soft);color:var(--accent)}
       .overview-grid{grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr)}
+      .overview-modes{display:inline-flex;width:auto;gap:4px;padding:4px;border-radius:10px}
+      .overview-modes .button{min-width:104px;border-radius:8px}
+      .overview-modes .button[aria-pressed="true"]{font-weight:500}
       .total-block{padding:32px;border-bottom:0;border-right:1px solid var(--line)}
       .breakdown{padding:32px}
       .total{font-size:48px}
@@ -313,9 +356,9 @@
       .button,.expense-row{transition:background-color 120ms ease-out,color 120ms ease-out}
     }
     @media print{
-      .masthead,.period-picker,.all-time,.desktop-actions,.filters,.install-panel,.toast,dialog{display:none!important}
+      .masthead,.period-picker,.all-time,.desktop-actions,.filters,.install-panel,.toast,.overview-toolbar,.budget-form,#editBudget,#setBudget,dialog{display:none!important}
       body{display:block;background:#fff;color:#000}
-      main.shell{width:100%;max-width:none;margin:0;padding:0!important}
+      main.shell{display:block;min-height:0;width:100%;max-width:none;margin:0;padding:0!important}
       .overview-surface,.expense-list{border:1px solid #ccc}
     }
   </style>
@@ -381,12 +424,40 @@
     </section>
     <p id="installStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
     <section id="overview" role="tabpanel" aria-labelledby="overviewTab">
+      <div class="overview-toolbar">
+        <div class="overview-modes" role="group" aria-label="Overview display">
+          <button class="button" id="spendingMode" type="button" aria-pressed="true">Spending</button>
+          <button class="button" id="budgetMode" type="button" aria-pressed="false">Budget</button>
+        </div>
+        <p class="overview-hint" id="budgetPeriodHint" hidden>Select a month to view its budget.</p>
+      </div>
       <div class="overview-surface">
         <div id="summary" class="overview-grid" hidden>
           <div class="total-block">
+            <div id="overviewMetrics">
             <p class="total-label" id="totalLabel">Total spent</p>
             <div class="total"><span id="totalAmount">0.00</span><span class="total-currency" data-currency>MAD</span></div>
             <p class="total-caption" id="expenseCount"></p>
+            </div>
+            <div class="budget-empty" id="budgetEmpty" hidden>
+              <h2>Set your monthly budget.</h2><p>Choose an amount to see what’s left as you spend.</p>
+              <button class="button" id="setBudget" type="button" aria-expanded="false" aria-controls="budgetForm">Set monthly budget</button>
+              <p class="total-caption" id="budgetEmptySpent"></p>
+            </div>
+            <div class="budget-details" id="budgetDetails" hidden>
+              <dl class="budget-figures">
+                <div class="budget-row"><dt>Monthly budget</dt><dd><span id="budgetTotal"></span><button class="button quiet" id="editBudget" type="button" aria-label="Edit monthly budget" aria-expanded="false" aria-controls="budgetForm">Edit</button></dd></div>
+                <div class="budget-row"><dt>Spent</dt><dd id="budgetSpent"></dd></div>
+              </dl>
+              <div class="budget-progress"><progress id="budgetProgress" max="100" value="0" aria-label="Monthly budget used"></progress><p id="budgetProgressLabel"></p></div>
+            </div>
+            <form class="budget-form" id="budgetForm" hidden novalidate>
+              <div class="field"><label for="budgetAmount">Monthly budget</label><div class="amount-field"><input id="budgetAmount" type="text" inputmode="decimal" maxlength="14" placeholder="0.00" autocomplete="off" required aria-describedby="budgetHelp budgetError"><span data-currency>MAD</span></div></div>
+              <p class="total-caption" id="budgetHelp"></p>
+              <p class="error" id="budgetError" role="alert" hidden></p>
+              <div class="budget-form-actions"><button class="button primary" id="saveBudget" type="submit">Save budget</button><button class="button quiet" id="cancelBudget" type="button">Cancel</button></div>
+              <button class="button quiet danger" id="removeBudget" type="button" hidden>Remove budget</button>
+            </form>
           </div>
           <div class="breakdown"><div class="section-heading"><h2>By category</h2><span class="muted">Share of spending</span></div><div id="categoryChart" aria-label="Spending by category"></div></div>
         </div>
@@ -406,6 +477,10 @@
       <div class="expense-list" id="expenseList"></div>
       <div class="empty" id="listEmpty" hidden><h2>No expenses to show.</h2><p id="listEmptyCopy">Try a different month or add an expense.</p><button class="button" type="button" id="clearFilters" hidden>Clear filters</button></div>
     </section>
+    <footer class="app-footer" role="contentinfo">
+      <p>© <span id="copyrightYear">2026</span> Fima. All rights reserved.</p>
+      <p class="footer-credit"><span>Made with <span role="img" aria-label="love">❤️</span> by</span> <a href="mailto:ammarhaddad@outlook.fr">Ammar HADDAD</a></p>
+    </footer>
   </main>
   <dialog id="expenseDialog" aria-labelledby="expenseDialogTitle">
     <div class="dialog-heading"><h2 id="expenseDialogTitle">Add expense</h2><button class="button quiet icon-button" type="button" data-close="expenseDialog" aria-label="Close expense form"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
@@ -475,15 +550,25 @@
     const esc=function(value){return String(value).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
     const uid=function(){return globalThis.crypto&&crypto.randomUUID?crypto.randomUUID():'f-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2)};
     const today=function(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
-    const initial=function(){return {version:3,currency:'MAD',theme:'system',categories:[{id:'groceries',name:'Groceries'},{id:'dining',name:'Food & coffee'},{id:'transport',name:'Transport'},{id:'home',name:'Home'},{id:'shopping',name:'Shopping'},{id:'health',name:'Health'},{id:'leisure',name:'Leisure'},{id:'uncategorized',name:'Uncategorized'}],expenses:[]}};
+    const initial=function(){return {version:4,currency:'MAD',theme:'system',overviewMode:'spending',budgets:{},categories:[{id:'groceries',name:'Groceries'},{id:'dining',name:'Food & coffee'},{id:'transport',name:'Transport'},{id:'home',name:'Home'},{id:'shopping',name:'Shopping'},{id:'health',name:'Health'},{id:'leisure',name:'Leisure'},{id:'uncategorized',name:'Uncategorized'}],expenses:[]}};
     let state=initial(),view='overview',month=today().slice(0,7),allTime=false,editing=null,editingOriginal=null,undoState=null,pendingImport=null,rawRecovery=null,saveOK=true,lastStoredRaw=null;
     let editingCategory=null;
     let breakdownEnabled=false,manualAmount='',itemSequence=0;
     let pickerYear=Number(month.slice(0,4));
+    let budgetDraft=null;
+    function validMonth(value){return typeof value==='string'&&/^(19|20|21)\d{2}-(0[1-9]|1[0-2])$/.test(value)}
     function validDate(s){return typeof s==='string'&&/^(19|20|21)\d{2}-\d{2}-\d{2}$/.test(s)&&!isNaN(Date.parse(s+'T12:00:00Z'))&&new Date(s+'T12:00:00Z').toISOString().slice(0,10)===s}
     function validated(data){
-      if(!data||![1,2,3].includes(data.version)||!currencies.includes(data.currency)||!['system','light','dark'].includes(data.theme)||!Array.isArray(data.categories)||!Array.isArray(data.expenses))throw new Error('This is not a supported Fima backup.');
+      if(!data||![1,2,3,4].includes(data.version)||!currencies.includes(data.currency)||!['system','light','dark'].includes(data.theme)||!Array.isArray(data.categories)||!Array.isArray(data.expenses))throw new Error('This is not a supported Fima backup.');
       if(data.categories.length>200||data.expenses.length>10000)throw new Error('This file is too large. The limit is 10,000 expenses and 200 categories.');
+      const rawBudgets=data.version>=4?data.budgets:(data.budgets===undefined?{}:data.budgets);
+      const overviewMode=data.version>=4?data.overviewMode:(data.overviewMode===undefined?'spending':data.overviewMode);
+      if(!['spending','budget'].includes(overviewMode)||!rawBudgets||typeof rawBudgets!=='object'||Array.isArray(rawBudgets)||Object.keys(rawBudgets).length>3600)throw new Error('The monthly budget data or overview preference is invalid.');
+      const budgets={};
+      Object.entries(rawBudgets).forEach(function(entry){
+        if(!validMonth(entry[0])||!Number.isSafeInteger(entry[1])||entry[1]<=0||entry[1]>MAX_AMOUNT)throw new Error('A monthly budget has an invalid month or amount.');
+        budgets[entry[0]]=entry[1];
+      });
       const ids=new Set(),names=new Set();
       const categories=data.categories.map(function(c){
         if(!c||typeof c.id!=='string'||!c.id||c.id.length>150||typeof c.name!=='string'||!c.name.trim()||c.name.length>40||ids.has(c.id)||names.has(c.name.trim().toLowerCase()))throw new Error('The category data is invalid or duplicated.');
@@ -501,7 +586,7 @@
           if(typeof e.details!=='string'||e.details.length>1200)throw new Error('Expense details must be text of up to 1,200 characters.');
           details=e.details;
         }
-        const rawItems=data.version===3?e.items:(e.items===undefined?[]:e.items);
+        const rawItems=data.version>=3?e.items:(e.items===undefined?[]:e.items);
         if(!Array.isArray(rawItems)||rawItems.length>MAX_ITEMS)throw new Error('An expense breakdown must contain up to 100 items.');
         let itemTotal=0;
         const items=rawItems.map(function(item){
@@ -514,7 +599,7 @@
         entryIds.add(e.id);total+=e.amount;if(!Number.isSafeInteger(total))throw new Error('The total amount is too large.');
         return {id:e.id,details:details,amount:e.amount,date:e.date,categoryId:e.categoryId,items:items};
       });
-      return {version:3,currency:data.currency,theme:data.theme,categories:categories,expenses:expenses};
+      return {version:4,currency:data.currency,theme:data.theme,overviewMode:overviewMode,budgets:budgets,categories:categories,expenses:expenses};
     }
     function storageFailure(message){
       saveOK=false;$('storageWarning').textContent=message;$('storageWarning').hidden=false;
@@ -565,10 +650,38 @@
       if(includeNew)html+='<option value="__new__">+ New category…</option>';return html;
     }
     function renderOverview(){
+      const focused=document.activeElement;
       const list=periodExpenses(),total=list.reduce(function(s,e){return s+e.amount},0);
-      $('summary').hidden=!list.length;$('overviewEmpty').hidden=!!list.length;
-      $('totalAmount').textContent=number(total);$('totalLabel').textContent=allTime?'Total spent':'Spent this month';
+      const budgetMode=!allTime&&state.overviewMode==='budget',budget=state.budgets[month],hasBudget=budget!==undefined;
+      if(budgetDraft&&(!budgetMode||budgetDraft.month!==month))budgetDraft=null;
+      $('spendingMode').setAttribute('aria-pressed',String(!budgetMode));$('budgetMode').setAttribute('aria-pressed',String(budgetMode));
+      if(allTime&&document.activeElement===$('budgetMode'))$('spendingMode').focus({preventScroll:true});
+      $('budgetMode').disabled=allTime;$('budgetPeriodHint').hidden=!allTime;
+      if(allTime)$('budgetMode').setAttribute('aria-describedby','budgetPeriodHint');else $('budgetMode').removeAttribute('aria-describedby');
+      $('summary').hidden=!list.length&&!budgetMode;$('overviewEmpty').hidden=!!list.length||budgetMode;
+      $('overviewMetrics').hidden=budgetMode&&!hasBudget;
+      $('budgetEmpty').hidden=!budgetMode||hasBudget||!!budgetDraft;
+      $('budgetDetails').hidden=!budgetMode||!hasBudget||!!budgetDraft;
+      $('budgetForm').hidden=!budgetDraft;
+      $('setBudget').setAttribute('aria-expanded',String(!!budgetDraft));$('editBudget').setAttribute('aria-expanded',String(!!budgetDraft));
+      $('removeBudget').hidden=!budgetDraft||budgetDraft.original===null;
+      $('budgetEmptySpent').textContent=total?'Spent so far: '+money(total):'No expenses recorded this month.';
+      const overspent=budgetMode&&hasBudget&&total>budget;
+      $('summary').querySelector('.total-block').classList.toggle('over-budget',overspent);
+      $('summary').querySelector('.total-block').classList.toggle('budget-setup',budgetMode&&!hasBudget);
+      $('totalAmount').textContent=number(budgetMode&&hasBudget?Math.abs(budget-total):total);
+      $('totalLabel').textContent=budgetMode&&hasBudget?(overspent?'Over budget by':'Remaining'):(allTime?'Total spent':'Spent this month');
       $('expenseCount').textContent=list.length+' '+(list.length===1?'expense':'expenses')+' recorded';
+      $('expenseCount').hidden=budgetMode;
+      if(budgetMode&&hasBudget){
+        const used=total/budget*100,percentage=new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(used);
+        $('budgetTotal').textContent=money(budget);$('budgetSpent').textContent=money(total);
+        $('budgetProgress').value=Math.min(100,used);
+        $('budgetProgress').setAttribute('aria-valuetext',money(total)+' spent of '+money(budget)+'; '+percentage+'% used');
+        $('budgetProgressLabel').textContent=percentage+'% used'+(total===budget?' · Budget reached':'');
+      }
+      if(budgetDraft)$('budgetHelp').textContent='For '+periodName()+'. Applies to this month only.';
+      if(view==='overview')$('pageTitle').textContent=budgetMode?'Your budget':'Your spending';
       if(!list.length){const first=!state.expenses.length;$('emptyTitle').textContent=first?'Start with one expense.':'A clear month. So far.';
         $('emptyCopy').textContent=first?'A coffee, your groceries, this month’s rent. Add it here and see where your money goes.':'No expenses recorded for '+periodName()+'. Choose another month or add an expense.';
         $('overviewEmpty').querySelector('[data-add]').textContent=first?'Add your first expense':'Add expense';
@@ -577,8 +690,58 @@
       $('categoryChart').innerHTML=Array.from(totals).sort(function(a,b){return b[1]-a[1]}).map(function(entry){
         const pct=entry[1]/total*100;
         return '<div class="category-stat"><div class="category-stat-head"><span class="category-name">'+esc(categoryName(entry[0]))+'</span><span class="category-value">'+number(entry[1])+'</span></div><div class="category-measure"><div class="track" aria-hidden="true"><div class="track-fill" style="width:'+pct+'%"></div></div><span class="category-percent">'+(pct<1?'<1':Math.round(pct))+'%</span></div></div>';
-      }).join('');
+      }).join('')||'<p class="category-empty">Your category breakdown will appear after your first expense this month.</p>';
+      if(view==='overview'&&focused&&$('overview').contains(focused)&&!focused.getClientRects().length){
+        const target=budgetDraft?$('budgetAmount'):budgetMode?(hasBudget?$('editBudget'):$('setBudget')):$('spendingMode');
+        target.focus({preventScroll:true});
+      }
     }
+    function setOverviewMode(mode){
+      if(mode==='budget'&&allTime)return;
+      refreshExternal();
+      state.overviewMode=mode;
+      // A display preference must not replace the last expense or budget Undo.
+      if(undoState)undoState.overviewMode=mode;
+      write();renderOverview();
+    }
+    $('spendingMode').addEventListener('click',function(){setOverviewMode('spending')});
+    $('budgetMode').addEventListener('click',function(){setOverviewMode('budget')});
+    function clearBudgetError(){$('budgetError').hidden=true;$('budgetError').textContent=''}
+    function openBudget(){
+      refreshExternal();if(allTime||state.overviewMode!=='budget')return;
+      const original=state.budgets[month];
+      budgetDraft={month:month,original:original===undefined?null:original,currency:state.currency};
+      $('budgetAmount').value=original===undefined?'':(original/100).toFixed(2);
+      $('budgetAmount').removeAttribute('aria-invalid');clearBudgetError();
+      renderOverview();$('budgetAmount').focus();
+    }
+    function closeBudget(){budgetDraft=null;renderOverview();(state.budgets[month]===undefined?$('setBudget'):$('editBudget')).focus({preventScroll:true})}
+    function currentBudgetDraft(){
+      const draft=budgetDraft;refreshExternal();
+      if(!draft||!budgetDraft)return false;
+      const current=state.budgets[draft.month]===undefined?null:state.budgets[draft.month];
+      if(current!==draft.original||state.currency!==draft.currency){
+        error('budgetError','The budget or currency has changed. Cancel and reopen the editor before saving.');return false;
+      }
+      return true;
+    }
+    $('setBudget').addEventListener('click',openBudget);$('editBudget').addEventListener('click',openBudget);
+    $('cancelBudget').addEventListener('click',closeBudget);
+    $('budgetForm').addEventListener('keydown',function(event){if(event.key==='Escape'){event.preventDefault();closeBudget()}});
+    $('budgetAmount').addEventListener('input',function(){this.removeAttribute('aria-invalid');clearBudgetError()});
+    $('budgetForm').addEventListener('submit',function(event){
+      event.preventDefault();clearBudgetError();
+      if(!currentBudgetDraft())return;
+      const amount=parseAmount($('budgetAmount').value);
+      if(amount===null){error('budgetError','Enter a positive budget with up to two decimal places (maximum '+money(MAX_AMOUNT)+').');$('budgetAmount').setAttribute('aria-invalid','true');$('budgetAmount').focus();return}
+      const next=clone(state);next.budgets[budgetDraft.month]=amount;
+      if(commit(next,'Monthly budget saved.'))closeBudget();
+    });
+    $('removeBudget').addEventListener('click',function(){
+      if(!currentBudgetDraft())return;
+      const next=clone(state);delete next.budgets[budgetDraft.month];
+      if(commit(next,'Monthly budget removed.'))closeBudget();
+    });
     function itemCount(e){return e.items.length?'<span class="expense-items">'+e.items.length+' '+(e.items.length===1?'item':'items')+'</span>':''}
     function renderExpenses(){
       const search=$('search').value.trim().toLowerCase(),category=$('categoryFilter').value;
@@ -629,7 +792,7 @@
     }
     function changeView(next){
       const changed=view!==next;
-      view=next;$('overview').hidden=view!=='overview';$('expenses').hidden=view!=='expenses';$('pageTitle').textContent=view==='overview'?'Your spending':'Your expenses';
+      view=next;$('overview').hidden=view!=='overview';$('expenses').hidden=view!=='expenses';$('pageTitle').textContent=view==='overview'?(!allTime&&state.overviewMode==='budget'?'Your budget':'Your spending'):'Your expenses';
       ['overview','expenses'].forEach(function(id){$(id+'Tab').setAttribute('aria-selected',String(id===view));$(id+'Tab').tabIndex=id===view?0:-1});
       if(changed)window.scrollTo(0,0);
     }
@@ -894,9 +1057,14 @@
     function fingerprint(e){return JSON.stringify([e.details,e.amount,e.date,e.categoryId,e.items||[]])}
     function hash(text){let n=2166136261;for(let i=0;i<text.length;i++){n^=text.charCodeAt(i);n=Math.imul(n,16777619)}return (n>>>0).toString(36)}
     function mergeData(incoming){
-      if(state.expenses.length&&incoming.expenses.length&&incoming.currency!==state.currency)throw new Error('This backup uses '+incoming.currency+', but your expenses use '+state.currency+'. Different currencies cannot be merged.');
-      const next=clone(state),mapping=new Map(),byId=new Map(next.expenses.map(function(e){return [e.id,e]}));let added=0,duplicates=0,conflicts=0;
-      if(!state.expenses.length)next.currency=incoming.currency;
+      const hasCurrentMoney=!!(state.expenses.length||Object.keys(state.budgets).length),hasIncomingMoney=!!(incoming.expenses.length||Object.keys(incoming.budgets).length);
+      if(hasCurrentMoney&&hasIncomingMoney&&incoming.currency!==state.currency)throw new Error('This backup uses '+incoming.currency+', but your records use '+state.currency+'. Different currencies cannot be merged.');
+      const next=clone(state),mapping=new Map(),byId=new Map(next.expenses.map(function(e){return [e.id,e]}));let added=0,duplicates=0,conflicts=0,budgetsAdded=0,budgetsKept=0;
+      if(!hasCurrentMoney){next.currency=incoming.currency;next.overviewMode=incoming.overviewMode}
+      Object.entries(incoming.budgets).forEach(function(entry){
+        if(next.budgets[entry[0]]===undefined){next.budgets[entry[0]]=entry[1];budgetsAdded++}
+        else if(next.budgets[entry[0]]!==entry[1])budgetsKept++;
+      });
       incoming.categories.forEach(function(c){
         const match=next.categories.find(function(current){return current.name.toLowerCase()===c.name.toLowerCase()});
         if(match){mapping.set(c.id,match.id);return}
@@ -913,7 +1081,7 @@
         }
         next.expenses.push(e);byId.set(e.id,e);added++;
       });
-      return {next:validated(next),added:added,duplicates:duplicates,conflicts:conflicts};
+      return {next:validated(next),added:added,duplicates:duplicates,conflicts:conflicts,budgetsAdded:budgetsAdded,budgetsKept:budgetsKept};
     }
     $('importBackup').addEventListener('click',function(){$('backupFile').value='';$('backupFile').click()});
     $('backupFile').addEventListener('change',async function(){
@@ -923,13 +1091,13 @@
         let parsed;try{parsed=JSON.parse(await file.text())}catch(e){throw new Error('This file is not valid JSON. Choose an exported Fima backup.')}
         if(parsed.app!=='fima-personal')throw new Error('Choose a JSON backup exported from this personal Fima app.');
         const incoming=validated(parsed),result=mergeData(incoming);pendingImport=incoming;
-        $('importSummary').textContent=result.added+' new '+(result.added===1?'expense':'expenses')+' will be added. '+result.duplicates+' already present.'+(result.conflicts?' '+result.conflicts+' changed '+(result.conflicts===1?'record is':'records are')+' kept as separate copies; your current records stay unchanged.':' Your current records stay unchanged.');
+        $('importSummary').textContent=result.added+' new '+(result.added===1?'expense':'expenses')+' will be added. '+result.duplicates+' already present.'+(result.conflicts?' '+result.conflicts+' changed '+(result.conflicts===1?'record is':'records are')+' kept as separate copies; your current records stay unchanged.':' Your current records stay unchanged.')+(Object.keys(incoming.budgets).length?' '+result.budgetsAdded+' new monthly '+(result.budgetsAdded===1?'budget':'budgets')+' will be added.':'')+(result.budgetsKept?' '+result.budgetsKept+' '+(result.budgetsKept===1?'conflicting budget will':'conflicting budgets will')+' keep your current amount.':'');
         $('importReview').hidden=false;$('confirmImport').focus();
       }catch(e){error('importError',e.message)}
     });
     $('confirmImport').addEventListener('click',function(){
       if(!pendingImport)return;
-      try{const result=mergeData(pendingImport);if(commit(result.next,'Backup merged: '+result.added+' new '+(result.added===1?'expense.':'expenses.'))){pendingImport=null;$('importReview').hidden=true;allTime=true;render()}}
+      try{const result=mergeData(pendingImport);if(commit(result.next,'Backup merged: '+result.added+' new '+(result.added===1?'expense':'expenses')+', '+result.budgetsAdded+' new monthly '+(result.budgetsAdded===1?'budget.':'budgets.')+(result.budgetsKept?' Existing budgets kept for '+result.budgetsKept+' '+(result.budgetsKept===1?'month.':'months.'):''))){pendingImport=null;$('importReview').hidden=true;allTime=true;render()}}
       catch(e){error('importError',e.message)}
     });
     $('cancelImport').addEventListener('click',function(){pendingImport=null;$('importReview').hidden=true});
@@ -937,6 +1105,7 @@
       if(e.key!==KEY&&e.key!==null)return;
       if(refreshExternal()){if($('expenseDialog').open&&editing)error('expenseError','Records changed in another tab. If this expense changed, close and reopen it before saving.');notify(rawRecovery===null?'Records updated from another tab.':'Saved data could not be read. Export your open records.',false)}
     });
+    $('copyrightYear').textContent=String(new Date().getFullYear());
     render();changeView('overview');
   })();
   </script>
