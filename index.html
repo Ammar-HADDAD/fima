@@ -2,16 +2,41 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f4f5f7" id="themeColor">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Fima">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="description" content="A private, offline personal expense tracker.">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; manifest-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <script>
+  // Capture installation events even if they arrive before the app has rendered.
+  (function(){
+    const installation=window.fimaInstallation={deferred:null,installed:false,accepted:false,onChange:null};
+    window.addEventListener('beforeinstallprompt',function(event){
+      if(typeof event.prompt!=='function')return;
+      event.preventDefault();
+      if(installation.installed||installation.accepted)return;
+      installation.deferred=event;
+      if(installation.onChange)installation.onChange();
+    });
+    window.addEventListener('appinstalled',function(){
+      installation.installed=true;installation.deferred=null;
+      if(installation.onChange)installation.onChange();
+    });
+  })();
+  </script>
+  <link rel="icon" type="image/svg+xml" href="./assets/icons/favicon.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="./assets/icons/apple-touch-icon.png">
+  <link rel="manifest" href="./manifest.webmanifest">
   <title>Fima — Personal expenses</title>
   <!-- THESIS: A personal ledger with a summary and a separate record book. No account or shared-money concepts.
        OWN-WORLD: Paper-white/slate surfaces, ink typography, rust actions; precise rules and aligned money.
        STORY: Choose a period, understand spending, and record a purchase without setup.
-       FIRST VIEWPORT: Horizontal masthead, two tabs, month controls, total and category distribution. Empty on first use.
-       FORM: Direct implementation of the user's personal-only simplification brief; no seeded design selection was performed. One self-contained offline file. -->
+       FIRST VIEWPORT: Compact masthead with Settings; month controls and a concise spending summary above categories. A raised, centered Add button anchors the bottom bar between Overview and Expenses.
+       FORM: User-directed mobile revision within the established functionalist identity. Expanded Settings, focused expense sheets, and a matching home-screen monogram. Local data, no remote services. -->
   <style>
     :root {
       color-scheme: light;
@@ -20,6 +45,7 @@
       --danger:#b02c32;--success:#276746;--warning-bg:#fff1dc;--warning-ink:#73490d;
       --shadow:0 18px 70px rgb(12 22 38 / .2);
       --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,sans-serif;
+      --nav-height:76px;--visible-height:100dvh;--viewport-bottom:0px;
     }
     @media(prefers-color-scheme:dark) {
       :root:not([data-theme="light"]) {
@@ -36,10 +62,12 @@
     *{box-sizing:border-box}
     [hidden]{display:none!important}
     body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--font);-webkit-font-smoothing:antialiased}
+    html.modal-open{overflow:hidden}
+    html.modal-open body{position:fixed;left:0;right:0;overflow:hidden}
     button,input,select,textarea{font:inherit}
     button{cursor:pointer}
     button:disabled{cursor:default;opacity:.45}
-    button,input,select,textarea,summary{touch-action:manipulation}
+    button,input,select,textarea,summary{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
     :focus-visible{outline:3px solid var(--focus);outline-offset:3px}
     h1,h2,h3,p{margin:0}
     h1{font-size:clamp(26px,4vw,34px);font-weight:650;line-height:1.2;letter-spacing:-.03em}
@@ -48,13 +76,13 @@
     a{color:var(--accent)}
     .icon{width:20px;height:20px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
     .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-    .shell{max-width:1080px;margin:0 auto;padding:0 20px}
-    .masthead{background:var(--surface);border-bottom:1px solid var(--line)}
-    .masthead-inner{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:86px}
+    .shell{max-width:1080px;margin:0 auto;padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right))}
+    .masthead{padding-top:env(safe-area-inset-top);background:var(--surface);border-bottom:1px solid var(--line)}
+    .masthead-inner{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:68px}
     .brand{display:flex;align-items:center;gap:12px}
     .wordmark{font-size:30px;line-height:1;font-weight:750;letter-spacing:-.04em}
     .wordmark span{color:var(--accent)}
-    .brand-description{display:none;color:var(--muted);font-size:13px;border-left:1px solid var(--line);padding-left:14px;line-height:1.35}
+    .brand-description{color:var(--muted);font-size:13px;border-left:1px solid var(--line);padding-left:14px;line-height:1.35}
     .button{min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px 15px;background:var(--surface);color:var(--ink);font-weight:550;font-size:14px;line-height:1.3;text-decoration:none;white-space:nowrap}
     .button:hover{background:var(--soft)}
     .button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
@@ -63,30 +91,47 @@
     .button.quiet:hover{background:var(--soft);color:var(--ink)}
     .button.danger{color:var(--danger)}
     .icon-button{width:44px;padding:10px}
-    .header-actions{display:flex;gap:5px;align-items:center}
-    .desktop-label{display:none}
-    .tabs{display:flex;gap:30px}
-    .tab{min-height:54px;padding:14px 0 12px;border:0;border-bottom:3px solid transparent;background:transparent;color:var(--muted);font-size:14px;font-weight:550}
-    .tab[aria-selected="true"]{border-bottom-color:var(--accent);color:var(--ink)}
-    main{padding-top:32px!important;padding-bottom:100px!important}
-    .page-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:28px}
+    .app-nav{position:fixed;inset:auto 0 0;z-index:4;min-height:var(--nav-height);padding:6px max(12px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:var(--surface);border-top:1px solid var(--line)}
+    .tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;min-width:0}
+    #expensesTab{grid-column:3}
+    .tab,.nav-action{min-width:0;min-height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:0;border-radius:8px;padding:6px 2px;background:transparent;color:var(--muted);font-size:12px;font-weight:550;line-height:1.3}
+    .tab .icon,.nav-action .icon{width:22px;height:22px}
+    .tab[aria-selected="true"]{color:var(--accent)}
+    .tab:active,.nav-action:active{background:var(--soft)}
+    .nav-add{position:absolute;left:50%;top:-18px;transform:translateX(-50%);width:80px;padding:0;gap:5px;color:var(--accent)}
+    .nav-add .nav-add-icon{display:grid;place-items:center;width:56px;height:56px;border-radius:50%;background:var(--accent);color:var(--on-accent);box-shadow:0 5px 14px rgb(12 22 38 / .18)}
+    .nav-add .icon{width:26px;height:26px;stroke-width:1.8}
+    .nav-add:active{background:transparent}
+    .nav-add:active .nav-add-icon{background:var(--accent-hover)}
+    .settings-trigger{flex:none}
+    .nav-add-long{display:none}
+    main{padding-top:24px;padding-bottom:calc(var(--nav-height) + env(safe-area-inset-bottom) + 48px)}
+    .page-heading{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:20px 8px;margin-bottom:24px}
     .eyebrow{font-size:13px;color:var(--muted);margin-top:7px}
-    .period-picker{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
-    .period-picker input{width:172px;min-height:44px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-size:14px}
-    .period-picker .all-time{padding:10px;font-size:13px}
-    .period-picker .all-time[aria-pressed="true"]{color:var(--accent);background:var(--soft)}
+    .period-picker{grid-column:1/-1;grid-row:2;width:100%;min-width:0}
+    .month-control{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+    .period-picker input{width:100%;min-width:0;min-height:44px;padding:8px 0;border:0;border-radius:0;background:transparent;color:var(--ink);font-size:16px;text-align:center}
+    .all-time{grid-column:2;grid-row:1;padding:10px 8px;font-size:14px}
+    .all-time[aria-pressed="true"]{color:var(--accent);background:var(--soft)}
+    .period-picker input:disabled{color:var(--muted);opacity:.6}
     .storage-warning{padding:14px 16px;background:var(--warning-bg);color:var(--warning-ink);border-radius:8px;margin-bottom:20px;font-size:14px}
+    .install-panel{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px 12px;margin-bottom:24px;padding:12px 16px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+    .install-panel h2{font-size:16px;font-weight:550;line-height:1.4;letter-spacing:0;overflow-wrap:anywhere}
+    .install-panel p{grid-column:1/-1;margin:0 0 4px;font-size:14px;color:var(--muted);line-height:1.5;max-width:65ch}
+    .install-panel .button{min-height:44px}
+    #installApp,#dismissInstallGuide{grid-column:2;grid-row:1}
+    #dismissInstallGuide{align-self:start}
     .overview-surface{background:var(--surface);border:1px solid var(--line);border-radius:12px}
     .overview-grid{display:grid;grid-template-columns:minmax(0,1fr)}
-    .total-block{padding:28px 24px;border-bottom:1px solid var(--line)}
-    .total-label{color:var(--muted);font-size:14px;margin-bottom:17px}
-    .total{font-size:clamp(29px,5vw,54px);font-weight:600;line-height:1.08;letter-spacing:-.035em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-    .total-currency{display:block;font-size:14px;color:var(--muted);letter-spacing:0;font-weight:400;margin-top:10px}
-    .total-caption{color:var(--muted);font-size:13px;margin-top:25px}
-    .total-rule{height:3px;width:32px;background:var(--accent);margin-top:32px}
-    .breakdown{padding:25px 24px}
-    .section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:25px}
-    .section-heading .muted{font-size:12px}
+    .total-block{padding:24px 20px;border-bottom:1px solid var(--line)}
+    .total-label{color:var(--muted);font-size:14px;margin-bottom:12px}
+    .total{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px 10px;font-size:clamp(38px,9vw,54px);font-weight:600;line-height:1.08;letter-spacing:-.035em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+    #totalAmount{min-width:0}
+    .total-currency{font-size:14px;color:var(--muted);letter-spacing:0;font-weight:500}
+    .total-caption{color:var(--muted);font-size:13px;margin-top:14px}
+    .breakdown{padding:24px 20px}
+    .section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px}
+    .section-heading .muted{font-size:12px;text-align:right}
     .category-stat+.category-stat{margin-top:20px}
     .category-stat-head{display:flex;align-items:baseline;gap:12px;justify-content:space-between;margin-bottom:8px;font-size:14px}
     .category-name{min-width:0;overflow-wrap:anywhere}
@@ -100,20 +145,18 @@
     .empty-symbol .icon{width:25px;height:25px}
     .empty h2{margin-bottom:9px}
     .empty p{max-width:380px;margin:0 auto 25px;color:var(--muted);font-size:14px}
-    .footnote{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:22px;font-size:12px;color:var(--muted)}
-    .save-indicator{display:flex;align-items:center;gap:7px}
-    .save-dot{width:6px;height:6px;border-radius:50%;background:var(--success)}
-    .save-indicator.unsaved .save-dot{background:var(--danger)}
     .filters{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;margin-bottom:18px}
     .search-field{position:relative}
     .search-field .icon{position:absolute;left:13px;top:13px;color:var(--muted)}
     .search-field input{padding-left:42px}
-    input,select,textarea{width:100%;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);padding:11px 12px;min-height:44px;min-width:0}
+    input,select,textarea{width:100%;max-width:100%;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);padding:11px 12px;min-height:48px;min-width:0;font-size:16px}
+    input[type="date"],input[type="month"]{display:block;min-inline-size:0;-webkit-appearance:none;appearance:none}
+    input::-webkit-date-and-time-value{min-width:0;text-align:left}
     input::placeholder,textarea::placeholder{color:var(--muted);opacity:1}
     textarea{resize:vertical;min-height:92px}
     .list-heading{display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--muted);padding:3px 0 13px}
     .expense-list{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-    .expense-row{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:14px;text-align:left;background:var(--surface);border:0;border-bottom:1px solid var(--line);padding:19px 18px;color:var(--ink)}
+    .expense-row{width:100%;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,auto);column-gap:12px;text-align:left;background:var(--surface);border:0;border-bottom:1px solid var(--line);padding:18px 16px;color:var(--ink)}
     .expense-row:last-child{border-bottom:0}
     .expense-row:hover{background:var(--soft)}
     .expense-row:focus-visible{outline-offset:-4px}
@@ -121,71 +164,104 @@
     .expense-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:5px;color:var(--muted);font-size:12px}
     .expense-note{display:block;color:var(--muted);font-size:13px;margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
     .expense-info{min-width:0}
-    .expense-value{font-size:15px;font-variant-numeric:tabular-nums;font-weight:550;text-align:right}
+    .expense-value{font-size:16px;font-variant-numeric:tabular-nums;font-weight:550;text-align:right;overflow-wrap:anywhere}
     .expense-edit{display:block;font-size:12px;font-weight:400;color:var(--muted);margin-top:6px}
     .muted{color:var(--muted)}
     .small{font-size:13px}
-    dialog{color:var(--ink);background:var(--surface);border:0;border-radius:14px;box-shadow:var(--shadow);width:min(560px,calc(100% - 24px));max-height:calc(100dvh - 32px);padding:0;overflow:auto}
+    dialog{position:fixed;inset:auto 0 var(--viewport-bottom);margin:0 auto;color:var(--ink);background:var(--surface);border:0;border-radius:20px 20px 0 0;box-shadow:var(--shadow);width:100%;max-width:560px;max-height:calc(var(--visible-height) - max(12px,env(safe-area-inset-top)));padding:0;overflow:hidden}
+    dialog[open]{display:flex;flex-direction:column}
     dialog::backdrop{background:rgb(12 22 38 / .52)}
-    .dialog-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:23px 24px 15px}
-    .dialog-heading h2{font-size:23px;letter-spacing:-.025em}
-    .dialog-body{padding:0 24px 24px}
+    .dialog-heading{flex:none;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 20px;border-bottom:1px solid var(--line)}
+    .dialog-heading h2{font-size:22px;letter-spacing:-.025em}
+    .dialog-body{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:20px 20px max(24px,env(safe-area-inset-bottom));scroll-padding:20px;-webkit-overflow-scrolling:touch}
+    #expenseForm{display:flex;flex-direction:column;padding:0;overflow:hidden}
+    .form-content{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:20px;scroll-padding:20px;-webkit-overflow-scrolling:touch}
     .form-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:18px}
-    .field{display:flex;flex-direction:column;gap:7px;font-size:13px;color:var(--muted)}
+    .field{display:flex;flex-direction:column;min-width:0;gap:7px;font-size:14px;color:var(--muted)}
     .field-label{display:flex;justify-content:space-between;gap:10px}
     .full{grid-column:1/-1}
     .amount-field{position:relative}
     .amount-field input{font-size:32px;line-height:1.2;padding:14px 75px 14px 15px;font-variant-numeric:tabular-nums;letter-spacing:-.025em}
     .amount-field span{position:absolute;right:16px;top:24px;font-size:14px;color:var(--muted)}
-    .dialog-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:26px}
+    .dialog-actions{flex:none;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin:0;padding:16px 20px max(16px,env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--surface)}
+    .dialog-actions .button{min-height:48px;font-size:16px}
+    .dialog-actions .primary{flex:1}
     .dialog-actions .delete-action{margin-right:auto}
     .error{padding:12px 14px;background:var(--warning-bg);color:var(--warning-ink);font-size:14px;border-radius:8px;margin-top:15px}
-    .settings-section{padding:22px 0;border-bottom:1px solid var(--line)}
-    .settings-section:first-child{padding-top:7px}
+    .settings-section{padding:26px 0;border-bottom:1px solid var(--line)}
+    .settings-section>h3{font-size:14px;font-weight:550;color:var(--muted)}
+    .settings-section:first-of-type{padding-top:0}
     .settings-section:last-child{border-bottom:0;padding-bottom:0}
-    .settings-section p{color:var(--muted);font-size:13px;max-width:65ch;margin-top:8px}
+    .settings-section p{color:var(--muted);font-size:14px;max-width:65ch;margin-top:8px}
     .settings-buttons{display:flex;flex-wrap:wrap;gap:8px;margin-top:17px}
-    .settings-section summary{cursor:pointer;min-height:44px;display:flex;align-items:center;justify-content:space-between;font-weight:550;font-size:16px;list-style:none}
-    .settings-section summary::-webkit-details-marker{display:none}
-    .settings-section summary::after{content:"+";font-weight:400;font-size:23px;color:var(--muted)}
-    .settings-section[open] summary::after{content:"−"}
-    .settings-section .form-grid{margin-top:16px}
-    .settings-feedback{padding:12px 14px;margin-bottom:16px;background:var(--soft);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px}
-    .category-editor{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:6px;margin-top:12px}
-    .category-editor input{font-size:14px}
-    .category-editor .button{padding:10px}
-    .category-editor .category-count{font-size:12px;color:var(--muted);grid-column:1/-1;margin-top:-2px}
-    .category-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:22px}
+    .backup-actions{margin-top:10px}
+    .backup-action{display:grid;grid-template-columns:20px minmax(0,1fr);align-items:center;gap:12px;width:100%;min-height:48px;padding:10px 0;text-align:left;border:0;border-radius:8px;background:transparent;color:var(--ink)}
+    .backup-action:active{background:var(--soft)}
+    .backup-action:focus-visible{outline-offset:-4px}
+    .backup-action>.icon{color:var(--muted)}
+    .backup-action .backup-title{font-size:16px;font-weight:400}
+    .preferences-grid{display:grid;gap:4px;margin-top:10px}
+    .preference-field{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:12px;align-items:center;font-size:16px;color:var(--ink)}
+    .preference-field select{border-color:transparent;background-color:transparent;text-align:right;color:var(--muted);padding-right:4px}
+    .preference-field select:focus-visible{background-color:var(--soft)}
+    .settings-feedback{position:sticky;top:0;z-index:1;padding:12px 14px;margin-bottom:16px;background:var(--soft);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px}
+    .category-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:62px;padding:8px 0;border-bottom:1px solid var(--line)}
+    .category-info{display:flex;flex-direction:column;gap:2px;min-width:0;overflow-wrap:anywhere}
+    .category-count{font-size:12px;color:var(--muted)}
+    .category-editor{padding:16px 0;border-bottom:1px solid var(--line)}
+    .category-editor input{font-size:16px}
+    .category-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:10px}
+    .category-actions [data-remove]{margin-right:auto}
+    .category-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:18px}
     .import-review{margin-top:18px;padding:16px;border:1px solid var(--line);border-radius:8px}
     .import-review p{margin-top:4px}
-    .toast{position:fixed;left:16px;right:16px;bottom:18px;max-width:620px;margin:auto;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:var(--ink);color:var(--surface);border-radius:10px;box-shadow:0 6px 24px rgb(0 0 0 / .15);font-size:14px}
+    .toast{position:fixed;left:16px;right:16px;bottom:calc(var(--nav-height) + env(safe-area-inset-bottom) + 30px);max-width:620px;margin:auto;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:var(--ink);color:var(--surface);border-radius:10px;box-shadow:0 6px 24px rgb(0 0 0 / .15);font-size:14px}
+    #toastText{min-width:0;overflow-wrap:anywhere}
     .toast-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
-    .toast button{border:0;min-height:40px;padding:8px;background:transparent;color:inherit;font:inherit;text-decoration:underline;text-underline-offset:4px}
-    .toast .toast-dismiss{width:36px;text-decoration:none;font-size:21px}
+    .toast button{border:0;min-height:44px;padding:8px;background:transparent;color:inherit;font:inherit;text-decoration:underline;text-underline-offset:4px}
+    .toast .toast-dismiss{width:44px;text-decoration:none;font-size:21px}
     @media(min-width:560px){
       .shell{padding-left:30px;padding-right:30px}
-      .brand-description,.desktop-label{display:block}
-      .header-actions{gap:10px}
       .form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
       .filters{grid-template-columns:minmax(0,1fr) 210px}
       .expense-row{padding:20px 24px}
+      dialog{inset:0 0 var(--viewport-bottom);margin:auto;width:calc(100% - 48px);max-height:calc(var(--visible-height) - 32px);border-radius:14px}
+      .dialog-heading{padding:18px 24px}
+      .dialog-body{padding:24px}
+      .form-content{padding:24px}
+      .dialog-actions{padding:16px 24px}
+      .dialog-actions .primary{flex:0 1 auto}
     }
     @media(min-width:800px){
-      .masthead-inner{min-height:94px}
-      main{padding-top:42px!important}
-      .page-heading{align-items:center;margin-bottom:32px}
+      .masthead-inner{min-height:88px}
+      .app-nav{position:static;display:flex;gap:16px;min-height:auto;padding:0;background:transparent;border:0;margin-left:auto}
+      .tabs{display:flex;gap:4px}
+      .tab,.nav-action{flex-direction:row;gap:8px;min-height:44px;padding:10px 12px;font-size:14px}
+      .tab .icon{display:none}
+      .nav-action .icon{width:20px;height:20px}
+      .nav-add{position:static;transform:none;width:auto;order:1;background:var(--accent);color:var(--on-accent);padding:10px 16px}
+      .nav-add .nav-add-icon{display:contents;box-shadow:none}
+      .tab[aria-selected="true"]{background:var(--soft)}
+      .nav-add-short{display:none}
+      .nav-add-long{display:inline}
+      main{padding-top:38px;padding-bottom:64px}
+      .page-heading{grid-template-columns:minmax(0,1fr) 270px auto;align-items:center;gap:16px;margin-bottom:32px}
+      .period-picker{grid-column:2;grid-row:1}
+      .all-time{grid-column:3;grid-row:1}
       .overview-grid{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}
       .total-block{padding:38px 36px;border-bottom:0;border-right:1px solid var(--line)}
       .breakdown{padding:35px 36px}
       .total-label{margin-bottom:28px}
-      .total-caption{margin-top:32px}
-      .total-rule{margin-top:58px}
+      .total-caption{margin-top:24px}
+      .toast{bottom:18px}
     }
+    @media(hover:hover){.tab:hover,.backup-action:hover{background:var(--soft)}.nav-add:hover .nav-add-icon{background:var(--accent-hover)}}
+    @media(hover:hover) and (min-width:800px){.nav-add:hover{background:var(--accent-hover);color:var(--on-accent)}}
     @media(prefers-reduced-motion:no-preference){
       .button,.expense-row{transition:background-color 120ms ease-out,color 120ms ease-out}
     }
     @media print{
-      .masthead,.period-picker,.filters,.footnote,.toast,dialog{display:none!important}
+      .masthead,.period-picker,.all-time,.filters,.install-panel,.toast,dialog{display:none!important}
       body{background:#fff;color:#000}
       main{padding:0!important}
       .overview-surface,.expense-list{border:1px solid #ccc}
@@ -201,6 +277,7 @@
     <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="var(--surface)"/><circle cx="16" cy="17" r="3" fill="var(--surface)"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
     <symbol id="i-book" viewBox="0 0 24 24"><path d="M6 3h13v18H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3ZM3 17h16M8 7h7M8 11h5"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10h4v10M10 20V4h4v16M16 20v-7h4v7M3 20h18"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
     <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4m-5 5 5-5 5 5M4 16v5h16v-5"/></symbol>
     <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></symbol>
@@ -208,34 +285,43 @@
   <header class="masthead">
     <div class="shell masthead-inner">
       <div class="brand"><div class="wordmark" aria-label="Fima">fima<span>.</span></div><div class="brand-description">Personal<br>expenses</div></div>
-      <div class="header-actions">
-        <button class="button quiet" id="openSettings" type="button" aria-label="Settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span class="desktop-label">Settings</span></button>
-        <button class="button primary" type="button" data-add><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Add expense</button>
-      </div>
+      <nav class="app-nav" aria-label="Main navigation">
+        <div class="tabs" role="tablist" aria-label="Expense tracker views">
+          <button class="tab" id="overviewTab" role="tab" type="button" aria-selected="true" aria-controls="overview"><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg><span>Overview</span></button>
+          <button class="tab" id="expensesTab" role="tab" type="button" aria-selected="false" aria-controls="expenses" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="#i-book"/></svg><span>Expenses</span></button>
+        </div>
+        <button class="nav-action nav-add" type="button" data-add aria-label="Add expense" aria-haspopup="dialog"><span class="nav-add-icon"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg></span><span class="nav-add-short">Add</span><span class="nav-add-long">Add expense</span></button>
+      </nav>
+      <button class="button quiet icon-button settings-trigger" id="openSettings" type="button" aria-label="Settings" aria-haspopup="dialog"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg></button>
     </div>
-    <nav class="shell tabs" role="tablist" aria-label="Expense tracker views">
-      <button class="tab" id="overviewTab" role="tab" type="button" aria-selected="true" aria-controls="overview">Overview</button>
-      <button class="tab" id="expensesTab" role="tab" type="button" aria-selected="false" aria-controls="expenses" tabindex="-1">Expenses</button>
-    </nav>
   </header>
   <main class="shell">
     <div id="storageWarning" class="storage-warning" role="alert" hidden></div>
     <div class="page-heading">
-      <div><h1 id="pageTitle">Your spending</h1><p class="eyebrow" id="periodLabel"></p></div>
+      <div><h1 id="pageTitle" tabindex="-1">Your spending</h1><p class="eyebrow" id="periodLabel"></p></div>
+      <button class="button quiet all-time" id="allTime" type="button" aria-pressed="false">All time</button>
       <div class="period-picker" aria-label="Choose a time period">
-        <button class="button quiet icon-button" id="previousMonth" type="button" aria-label="Previous month"><svg class="icon" aria-hidden="true"><use href="#i-left"/></svg></button>
-        <label class="sr-only" for="month">Month</label><input id="month" type="month" min="1900-01" max="2199-12">
-        <button class="button quiet icon-button" id="nextMonth" type="button" aria-label="Next month"><svg class="icon" aria-hidden="true"><use href="#i-right"/></svg></button>
-        <button class="button quiet all-time" id="allTime" type="button" aria-pressed="false">All time</button>
+        <div class="month-control">
+          <button class="button quiet icon-button" id="previousMonth" type="button" aria-label="Previous month"><svg class="icon" aria-hidden="true"><use href="#i-left"/></svg></button>
+          <label class="sr-only" for="month">Month</label><input id="month" type="month" min="1900-01" max="2199-12">
+          <button class="button quiet icon-button" id="nextMonth" type="button" aria-label="Next month"><svg class="icon" aria-hidden="true"><use href="#i-right"/></svg></button>
+        </div>
       </div>
     </div>
+    <section id="installPanel" class="install-panel" aria-labelledby="installTitle" hidden>
+      <h2 id="installTitle">Fima on your home screen</h2>
+      <button class="button primary" id="installApp" type="button" hidden>Install app</button>
+      <button class="button quiet icon-button" id="dismissInstallGuide" type="button" aria-label="Dismiss installation guide" hidden><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+      <p id="installGuide" hidden></p>
+    </section>
+    <p id="installStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
     <section id="overview" role="tabpanel" aria-labelledby="overviewTab">
       <div class="overview-surface">
         <div id="summary" class="overview-grid" hidden>
           <div class="total-block">
             <p class="total-label" id="totalLabel">Total spent</p>
             <div class="total"><span id="totalAmount">0.00</span><span class="total-currency" data-currency>MAD</span></div>
-            <p class="total-caption" id="expenseCount"></p><div class="total-rule" aria-hidden="true"></div>
+            <p class="total-caption" id="expenseCount"></p>
           </div>
           <div class="breakdown"><div class="section-heading"><h2>By category</h2><span class="muted">Share of spending</span></div><div id="categoryChart" aria-label="Spending by category"></div></div>
         </div>
@@ -255,11 +341,11 @@
       <div class="expense-list" id="expenseList"></div>
       <div class="empty" id="listEmpty" hidden><h2>No expenses to show.</h2><p id="listEmptyCopy">Try a different month or add an expense.</p><button class="button" type="button" id="clearFilters" hidden>Clear filters</button></div>
     </section>
-    <footer class="footnote"><span class="save-indicator" id="saveIndicator"><span class="save-dot"></span><span id="saveLabel">Saved in this browser</span></span></footer>
   </main>
   <dialog id="expenseDialog" aria-labelledby="expenseDialogTitle">
     <div class="dialog-heading"><h2 id="expenseDialogTitle">Add expense</h2><button class="button quiet icon-button" type="button" data-close="expenseDialog" aria-label="Close expense form"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
     <form class="dialog-body" id="expenseForm">
+      <div class="form-content">
       <div class="form-grid">
         <label class="field full" for="amount">Amount<div class="amount-field"><input id="amount" type="text" inputmode="decimal" placeholder="0.00" maxlength="14" required autocomplete="off"><span data-currency>MAD</span></div></label>
         <label class="field" for="expenseDate">Date<input id="expenseDate" type="date" min="1900-01-01" max="2199-12-31" required></label>
@@ -268,27 +354,35 @@
         <label class="field full" for="details"><span class="field-label">Details <span class="muted">(optional)</span></span><textarea id="details" maxlength="1200" rows="2" placeholder="e.g. Weekly groceries or lunch with a friend."></textarea></label>
       </div>
       <div id="expenseError" class="error" role="alert" hidden></div>
+      </div>
       <div class="dialog-actions"><button class="button quiet danger delete-action" id="deleteExpense" type="button" hidden>Delete</button><button class="button quiet" type="button" data-close="expenseDialog">Cancel</button><button class="button primary" type="submit" id="saveExpense">Save expense</button></div>
     </form>
   </dialog>
   <dialog id="settingsDialog" aria-labelledby="settingsTitle">
-    <div class="dialog-heading"><h2 id="settingsTitle">Make it yours.</h2><button class="button quiet icon-button" type="button" data-close="settingsDialog" aria-label="Close settings"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
+    <div class="dialog-heading"><h2 id="settingsTitle">Settings</h2><button class="button quiet icon-button" type="button" data-close="settingsDialog" aria-label="Close settings"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button></div>
     <div class="dialog-body">
       <div id="settingsFeedback" class="settings-feedback" hidden><span id="settingsFeedbackText" role="status" aria-live="polite"></span><button type="button" class="button quiet" id="settingsUndo">Undo</button></div>
-      <section class="settings-section">
-        <h3>Your data</h3>
-        <p>Stored in this browser, with no set expiry. Clearing browser data or moving this HTML file can make records unavailable. Keep a backup somewhere safe.</p>
-        <div class="settings-buttons">
-          <button class="button" id="exportBackup" type="button"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Export backup</button>
-          <button class="button" id="importBackup" type="button"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg>Import backup</button>
+      <section class="settings-section" aria-labelledby="preferencesTitle">
+        <h3 id="preferencesTitle">Preferences</h3>
+        <div class="preferences-grid">
+          <label class="preference-field" for="currency">Currency<select id="currency" aria-describedby="currencyHelp"><option value="MAD">MAD</option><option value="EUR">EUR</option><option value="USD">USD</option><option value="GBP">GBP</option><option value="CAD">CAD</option><option value="AED">AED</option></select></label>
+          <label class="preference-field" for="theme">Appearance<select id="theme"><option value="system">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
         </div>
+        <span class="sr-only" id="currencyHelp">Changing currency changes the label, not your amounts.</span>
+      </section>
+      <section class="settings-section">
+        <h3>Backups</h3>
+        <div class="backup-actions">
+          <button class="backup-action" id="exportBackup" type="button"><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span class="backup-title">Export backup</span></button>
+          <button class="backup-action" id="importBackup" type="button"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg><span class="backup-title">Import backup</span></button>
+        </div>
+        <p>Keep a backup before clearing browser data.</p>
         <input type="file" id="backupFile" accept=".json,application/json" hidden>
         <button class="button quiet danger" id="exportRecovery" type="button" hidden>Download unreadable saved data</button>
         <div class="error" id="importError" role="alert" hidden></div>
         <div id="importReview" class="import-review" hidden><h3>Review your backup</h3><p id="importSummary"></p><div class="settings-buttons"><button type="button" class="button primary" id="confirmImport">Merge backup</button><button type="button" class="button quiet" id="cancelImport">Cancel</button></div></div>
       </section>
-      <details class="settings-section" id="categoriesSettings"><summary>Manage categories</summary><p>Rename a category, or remove it to move its expenses to Uncategorized.</p><div id="categoryEditors"></div><div class="category-add"><label class="sr-only" for="newCategoryName">New category name</label><input id="newCategoryName" maxlength="40" placeholder="New category name"><button class="button" type="button" id="addCategory">Add</button></div><div class="error" id="categoryError" role="alert" hidden></div></details>
-      <details class="settings-section"><summary>Preferences</summary><div class="form-grid"><label class="field" for="currency">Currency<select id="currency"><option value="MAD">MAD · Moroccan dirham</option><option value="EUR">EUR · Euro</option><option value="USD">USD · US dollar</option><option value="GBP">GBP · British pound</option><option value="CAD">CAD · Canadian dollar</option><option value="AED">AED · UAE dirham</option></select></label><label class="field" for="theme">Appearance<select id="theme"><option value="system">Match device</option><option value="light">Light</option><option value="dark">Dark</option></select></label></div><p>Changing currency changes the label; existing amounts are not converted.</p></details>
+      <section class="settings-section" id="categoriesSettings" aria-labelledby="categoriesTitle"><h3 id="categoriesTitle">Categories</h3><div id="categoryEditors"></div><div class="category-add"><label class="sr-only" for="newCategoryName">New category name</label><input id="newCategoryName" maxlength="40" placeholder="New category name"><button class="button" type="button" id="addCategory">Add</button></div><div class="error" id="categoryError" role="alert" hidden></div></section>
     </div>
   </dialog>
   <div id="toast" class="toast" hidden><span id="toastText" role="status" aria-live="polite"></span><div class="toast-actions"><button type="button" id="undo">Undo</button><button class="toast-dismiss" type="button" id="dismissToast" aria-label="Dismiss notification">×</button></div></div>
@@ -305,6 +399,7 @@
     const today=function(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
     const initial=function(){return {version:2,currency:'MAD',theme:'system',categories:[{id:'groceries',name:'Groceries'},{id:'dining',name:'Food & coffee'},{id:'transport',name:'Transport'},{id:'home',name:'Home'},{id:'shopping',name:'Shopping'},{id:'health',name:'Health'},{id:'leisure',name:'Leisure'},{id:'uncategorized',name:'Uncategorized'}],expenses:[]}};
     let state=initial(),view='overview',month=today().slice(0,7),allTime=false,editing=null,editingOriginal=null,undoState=null,pendingImport=null,rawRecovery=null,saveOK=true,lastStoredRaw=null;
+    let editingCategory=null;
     function validDate(s){return typeof s==='string'&&/^(19|20|21)\d{2}-\d{2}-\d{2}$/.test(s)&&!isNaN(Date.parse(s+'T12:00:00Z'))&&new Date(s+'T12:00:00Z').toISOString().slice(0,10)===s}
     function validated(data){
       if(!data||![1,2].includes(data.version)||!currencies.includes(data.currency)||!['system','light','dark'].includes(data.theme)||!Array.isArray(data.categories)||!Array.isArray(data.expenses))throw new Error('This is not a supported Fima backup.');
@@ -333,11 +428,10 @@
     }
     function storageFailure(message){
       saveOK=false;$('storageWarning').textContent=message;$('storageWarning').hidden=false;
-      $('saveIndicator').classList.add('unsaved');$('saveLabel').textContent='Not saved to this browser';
     }
     function write(){
       if(rawRecovery!==null){storageFailure('The saved data could not be read. Changes are kept only in this open tab. Export a backup before closing; Settings also lets you download the unreadable data.');return false}
-      try{const raw=JSON.stringify(state);localStorage.setItem(KEY,raw);lastStoredRaw=raw;saveOK=true;$('storageWarning').hidden=true;$('saveIndicator').classList.remove('unsaved');$('saveLabel').textContent='Saved in this browser';return true}
+      try{const raw=JSON.stringify(state);localStorage.setItem(KEY,raw);lastStoredRaw=raw;saveOK=true;$('storageWarning').hidden=true;return true}
       catch(e){storageFailure('Browser storage is unavailable or full. Your changes are only in this open tab. Export a backup before closing.');return false}
     }
     try{
@@ -402,30 +496,59 @@
       }).join('');
     }
     function renderCategories(){
+      if(editingCategory&&!state.categories.some(function(c){return c.id===editingCategory.id}))editingCategory=null;
       $('categoryEditors').innerHTML=state.categories.map(function(c,index){
         const count=state.expenses.filter(function(e){return e.categoryId===c.id}).length;
-        if(c.id==='uncategorized')return '<div class="category-editor"><span class="small">Uncategorized</span><span class="category-count">'+count+' expenses · Default category</span></div>';
-        return '<div class="category-editor"><label class="sr-only" for="category-'+index+'">Category name: '+esc(c.name)+'</label><input id="category-'+index+'" data-category-name="'+esc(c.id)+'" value="'+esc(c.name)+'" maxlength="40"><button class="button" type="button" data-rename="'+esc(c.id)+'" aria-label="Save '+esc(c.name)+' category">Save</button><button class="button quiet icon-button danger" type="button" data-remove="'+esc(c.id)+'" aria-label="Remove '+esc(c.name)+' category"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button><span class="category-count">'+count+' '+(count===1?'expense':'expenses')+'</span></div>';
+        const caption=count+' '+(count===1?'expense':'expenses');
+        if(editingCategory&&editingCategory.id===c.id)return '<div class="category-editor"><label class="field" for="category-'+index+'">Category name: '+esc(c.name)+'<input id="category-'+index+'" data-category-name="'+esc(c.id)+'" value="'+esc(editingCategory.draft)+'" maxlength="40"></label><div id="categoryRenameError" class="error" role="alert" hidden></div><div class="category-actions"><button class="button quiet danger" type="button" data-remove="'+esc(c.id)+'" aria-label="Remove '+esc(c.name)+' category">Delete</button><button class="button quiet" type="button" data-category-cancel="'+esc(c.id)+'">Cancel</button><button class="button" type="button" data-rename="'+esc(c.id)+'" aria-label="Save '+esc(c.name)+' category">Save</button></div><p class="small">Deleting moves its expenses to Uncategorized.</p></div>';
+        return '<div class="category-row"><span class="category-info"><span>'+esc(c.name)+'</span><span class="category-count">'+caption+(c.id==='uncategorized'?' · Default':'')+'</span></span>'+(c.id==='uncategorized'?'':'<button class="button quiet" type="button" data-category-edit="'+esc(c.id)+'" aria-label="Edit '+esc(c.name)+' category"'+(editingCategory?' disabled':'')+'>Edit</button>')+'</div>';
       }).join('');
     }
+    function focusCategoryEdit(id){const button=Array.from(document.querySelectorAll('[data-category-edit]')).find(function(el){return el.dataset.categoryEdit===id});if(button)button.focus({preventScroll:true})}
+    $('categoryEditors').addEventListener('input',function(event){if(editingCategory&&event.target.matches('[data-category-name]'))editingCategory.draft=event.target.value});
+    $('categoryEditors').addEventListener('keydown',function(event){if(!event.target.matches('[data-category-name]'))return;const row=event.target.closest('.category-editor');if(event.key==='Enter'){event.preventDefault();row.querySelector('[data-rename]').click()}if(event.key==='Escape'){event.preventDefault();event.stopPropagation();row.querySelector('[data-category-cancel]').click()}});
+    function syncThemeChrome(){$('themeColor').content=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()}
+    window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change',syncThemeChrome);
     function render(){
       document.documentElement.dataset.theme=state.theme;
+      syncThemeChrome();
       $('month').value=month;$('month').disabled=allTime;$('allTime').setAttribute('aria-pressed',String(allTime));
       $('periodLabel').textContent=periodName();document.querySelectorAll('[data-currency]').forEach(function(el){el.textContent=state.currency});
       const category=$('categoryFilter').value;$('categoryFilter').innerHTML=optionList(true,false);$('categoryFilter').value=state.categories.some(function(c){return c.id===category})?category:'all';
       renderOverview();renderExpenses();renderCategories();$('currency').value=state.currency;$('theme').value=state.theme;$('exportRecovery').hidden=rawRecovery===null;
     }
     function changeView(next){
+      const changed=view!==next;
       view=next;$('overview').hidden=view!=='overview';$('expenses').hidden=view!=='expenses';$('pageTitle').textContent=view==='overview'?'Your spending':'Your expenses';
       ['overview','expenses'].forEach(function(id){$(id+'Tab').setAttribute('aria-selected',String(id===view));$(id+'Tab').tabIndex=id===view?0:-1});
+      if(changed)window.scrollTo(0,0);
     }
+    let dialogScrollY=0;
+    function fitDialogs(){
+      const viewport=window.visualViewport;
+      document.documentElement.style.setProperty('--visible-height',(viewport?viewport.height:window.innerHeight)+'px');
+      document.documentElement.style.setProperty('--viewport-bottom',Math.max(0,window.innerHeight-(viewport?viewport.height+viewport.offsetTop:window.innerHeight))+'px');
+    }
+    function showDialog(id){
+      dialogScrollY=window.scrollY;document.body.style.top=-dialogScrollY+'px';document.documentElement.classList.add('modal-open');
+      fitDialogs();$(id).showModal();
+      const scroller=$(id).querySelector('.form-content')||$(id).querySelector('.dialog-body');scroller.scrollTop=0;
+    }
+    document.querySelectorAll('dialog').forEach(function(dialog){
+      dialog.addEventListener('close',function(){
+        if(document.querySelector('dialog[open]'))return;
+        document.documentElement.classList.remove('modal-open');document.body.style.top='';window.scrollTo(0,dialogScrollY);
+      });
+    });
+    window.addEventListener('resize',fitDialogs);
+    if(window.visualViewport){window.visualViewport.addEventListener('resize',fitDialogs);window.visualViewport.addEventListener('scroll',fitDialogs)}
     function openExpense(id){
       const e=id?state.expenses.find(function(item){return item.id===id}):null;if(id&&!e)return;
       editing=e?e.id:null;editingOriginal=e?fingerprint(e):null;$('expenseForm').reset();$('expenseError').hidden=true;$('inlineCategoryField').hidden=true;
       $('expenseCategory').innerHTML=optionList(false,true);$('expenseCategory').value=e?e.categoryId:'uncategorized';
       $('amount').value=e?(e.amount/100).toFixed(2):'';$('expenseDate').value=e?e.date:today();$('details').value=e?e.details:'';
       $('deleteExpense').hidden=!e;$('expenseDialogTitle').textContent=e?'Edit expense':'Add expense';
-      $('expenseDialog').showModal();$('amount').focus();
+      showDialog('expenseDialog');$('amount').focus({preventScroll:true});
     }
     function closeDialog(id){$(id).close()}
     function error(id,message){$(id).textContent=message;$(id).hidden=false}
@@ -463,12 +586,16 @@
       const add=event.target.closest('[data-add]');if(add)openExpense();
       const edit=event.target.closest('[data-edit]');if(edit)openExpense(edit.dataset.edit);
       const close=event.target.closest('[data-close]');if(close)closeDialog(close.dataset.close);
+      const categoryEdit=event.target.closest('[data-category-edit]');
+      if(categoryEdit&&!editingCategory){const c=state.categories.find(function(c){return c.id===categoryEdit.dataset.categoryEdit});if(c){editingCategory={id:c.id,draft:c.name};$('categoryError').hidden=true;renderCategories();$('categoryEditors').querySelector('[data-category-name]').focus()}}
+      const categoryCancel=event.target.closest('[data-category-cancel]');
+      if(categoryCancel){const id=categoryCancel.dataset.categoryCancel;editingCategory=null;$('categoryError').hidden=true;renderCategories();focusCategoryEdit(id)}
       const rename=event.target.closest('[data-rename]');
       if(rename){
         const id=rename.dataset.rename,row=rename.closest('.category-editor'),name=row.querySelector('input').value.trim(),next=clone(state);
-        if(!name||name.length>40){error('categoryError','Enter a category name of 1–40 characters.');return}
-        if(next.categories.some(function(c){return c.id!==id&&c.name.toLowerCase()===name.toLowerCase()})){error('categoryError','That category already exists.');return}
-        next.categories.find(function(c){return c.id===id}).name=name;$('categoryError').hidden=true;commit(next,'Category renamed.');
+        if(!name||name.length>40){error('categoryRenameError','Enter a category name of 1–40 characters.');return}
+        if(next.categories.some(function(c){return c.id!==id&&c.name.toLowerCase()===name.toLowerCase()})){error('categoryRenameError','That category already exists.');return}
+        next.categories.find(function(c){return c.id===id}).name=name;$('categoryError').hidden=true;if(commit(next,'Category renamed.')){editingCategory=null;renderCategories();focusCategoryEdit(id)}
       }
       const remove=event.target.closest('[data-remove]');
       if(remove){const id=remove.dataset.remove;if(id==='uncategorized')return;const next=clone(state);next.categories=next.categories.filter(function(c){return c.id!==id});next.expenses.forEach(function(e){if(e.categoryId===id)e.categoryId='uncategorized'});commit(next,'Category removed. Its expenses are now Uncategorized.')}
@@ -482,7 +609,7 @@
     $('previousMonth').addEventListener('click',function(){moveMonth(-1)});$('nextMonth').addEventListener('click',function(){moveMonth(1)});
     $('allTime').addEventListener('click',function(){allTime=!allTime;render()});$('search').addEventListener('input',renderExpenses);$('categoryFilter').addEventListener('change',renderExpenses);
     $('clearFilters').addEventListener('click',function(){$('search').value='';$('categoryFilter').value='all';renderExpenses()});
-    function openSettings(){$('categoryError').hidden=true;$('importError').hidden=true;$('settingsFeedback').hidden=true;$('toast').hidden=true;renderCategories();$('settingsDialog').showModal()}
+    function openSettings(){$('categoryError').hidden=true;$('importError').hidden=true;$('settingsFeedback').hidden=true;$('toast').hidden=true;renderCategories();showDialog('settingsDialog')}
     $('openSettings').addEventListener('click',openSettings);
     $('currency').addEventListener('change',function(){const next=clone(state);next.currency=this.value;commit(next,'Currency label updated. Amounts were not converted.')});
     $('theme').addEventListener('change',function(){const next=clone(state);next.theme=this.value;commit(next,'Appearance updated.')});
@@ -541,6 +668,76 @@
       if(refreshExternal()){if($('expenseDialog').open&&editing)error('expenseError','Records changed in another tab. If this expense changed, close and reopen it before saving.');notify(rawRecovery===null?'Records updated from another tab.':'Saved data could not be read. Export your open records.',false)}
     });
     render();changeView('overview');
+  })();
+  </script>
+  <script>
+  (function(){
+    'use strict';
+    const installation=window.fimaInstallation;
+    delete window.fimaInstallation;
+    const panel=document.getElementById('installPanel'),button=document.getElementById('installApp');
+    const guide=document.getElementById('installGuide'),dismiss=document.getElementById('dismissInstallGuide');
+    const title=document.getElementById('installTitle'),status=document.getElementById('installStatus');
+    const dismissalKey='fima.installGuide.dismissed.v1';
+    const modes=['standalone','minimal-ui','fullscreen','window-controls-overlay'].map(function(mode){return window.matchMedia('(display-mode: '+mode+')')});
+    const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||((/Macintosh/.test(navigator.userAgent)||navigator.platform==='MacIntel')&&navigator.maxTouchPoints>1);
+    const loopback=location.hostname==='localhost'||location.hostname.endsWith('.localhost')||location.hostname==='127.0.0.1'||location.hostname==='[::1]';
+    const hosted=window.isSecureContext&&(location.protocol==='https:'||(location.protocol==='http:'&&loopback));
+    let busy=false,guideDismissed=false,manualNotice='',announcedInstalled=false;
+    try{guideDismissed=sessionStorage.getItem(dismissalKey)==='1'}catch(e){}
+
+    function standalone(){return navigator.standalone===true||modes.some(function(mode){return mode.matches})}
+    function finished(){return installation.installed||installation.accepted||standalone()}
+    function focusContent(){document.getElementById('pageTitle').focus({preventScroll:true})}
+    function manualInstructions(){
+      if(!hosted)return location.protocol==='file:'?'To install Fima, open the hosted HTTPS website.':'Open this website over HTTPS to install Fima.';
+      if(ios)return 'Open in Safari, tap Share, then Add to Home Screen, then Add.';
+      if(/Macintosh/.test(navigator.userAgent)&&/Safari/.test(navigator.userAgent)&&!/Chrome|Chromium|Edg|OPR/.test(navigator.userAgent))return 'In Safari, open the File menu and choose Add to Dock, if available. Otherwise, try a browser that supports installing web apps.';
+      return 'Look in your browser’s menu for Install app or Add to Home Screen. If neither is available, try Chrome on Android or Safari on iPhone/iPad.';
+    }
+    function sync(){
+      const focused=document.activeElement,hadFocus=panel.contains(focused);
+      const hidden=finished(),available=hosted&&!ios&&!!installation.deferred;
+      const showPrompt=!hidden&&(available||busy);
+      panel.hidden=hidden||(!showPrompt&&guideDismissed);
+      button.hidden=!showPrompt;button.disabled=busy;button.textContent=busy?'Opening…':'Install app';
+      dismiss.hidden=!(!hidden&&!showPrompt&&!guideDismissed);
+      guide.hidden=!(!hidden&&!showPrompt&&!guideDismissed);
+      title.textContent='Fima on your home screen';
+      guide.textContent=(manualNotice?manualNotice+' ':'')+manualInstructions();
+      if(installation.installed&&!announcedInstalled){status.textContent='Fima is installed. Open it from your home screen.';announcedInstalled=true}
+      if(hadFocus&&(panel.hidden||(focused===button&&(button.hidden||button.disabled))||(focused===dismiss&&dismiss.hidden)))focusContent();
+    }
+    function showManualNotice(message){
+      manualNotice=message;guideDismissed=false;status.textContent=message;
+      try{sessionStorage.removeItem(dismissalKey)}catch(e){}
+    }
+    installation.onChange=sync;
+    modes.forEach(function(mode){if(mode.addEventListener)mode.addEventListener('change',sync);else if(mode.addListener)mode.addListener(sync)});
+    window.addEventListener('pageshow',sync);
+    dismiss.addEventListener('click',function(){
+      guideDismissed=true;
+      try{sessionStorage.setItem(dismissalKey,'1')}catch(e){}
+      sync();
+    });
+    button.addEventListener('click',async function(){
+      if(busy||finished()||!hosted||ios||!installation.deferred)return;
+      const event=installation.deferred;
+      installation.deferred=null;busy=true;manualNotice='';sync();
+      try{
+        // prompt() must stay inside this user gesture; one call per captured event.
+        const result=await event.prompt();
+        const choice=event.userChoice?await event.userChoice:result;
+        if(installation.installed||standalone())return;
+        if(choice&&choice.outcome==='accepted'){
+          installation.accepted=true;installation.deferred=null;
+          status.textContent='Install request accepted. Your browser will finish installing Fima.';
+        }else showManualNotice('Installation dismissed. You can install later from your browser.');
+      }catch(e){
+        if(!finished())showManualNotice('The install prompt could not open. Use your browser’s installation menu.');
+      }finally{busy=false;sync()}
+    });
+    sync();
   })();
   </script>
 </body>
